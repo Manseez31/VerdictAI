@@ -32,8 +32,9 @@ import json
 from pathlib import Path
 import csv
 
-from arena_routing import decide_arena
+from arena_routing import build_where_for_category, decide_arena
 from case_intelligence import DEMO_CASES, run_case_intelligence
+from verification import run_verified_legal_analysis
 from case_intelligence.documents import UnsupportedDocument, extract_document_text
 from case_report_pdf import build_case_report_pdf
 from case_simulator import run_case_simulation
@@ -138,7 +139,7 @@ async def rate_limit_middleware(request: Request, call_next):
     # share the per-IP limit.
     if request.url.path in (
         "/chat", "/translate", "/simulate-case", "/simulate-case/pdf",
-        "/case-intelligence", "/extract-document",
+        "/case-intelligence", "/extract-document", "/verify-legal",
     ):
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.allow(client_ip):
@@ -708,6 +709,90 @@ def _secure_case_report(report: Dict[str, Any], scan) -> Dict[str, Any]:
 def case_intelligence_page():
     page_path = Path(__file__).parent / "case-intelligence.html"
     return HTMLResponse(content=page_path.read_text(encoding="utf-8"))
+
+
+# ---- Phase 2: Multi-Agent Legal Verification ----
+# A NEW endpoint. /chat is untouched, so every existing client keeps working.
+# This path trades ~5 LLM calls for independent verification of the answer.
+
+class VerifyRequest(BaseModel):
+    question: str
+    arena: str = "All (auto)"
+
+
+@app.post("/verify-legal",
+          dependencies=[Depends(require_permission(Permission.CHAT_QUERY))])
+def verify_legal_endpoint(req: VerifyRequest, request: Request):
+    """Answer a legal question through the multi-agent verification pipeline.
+
+    Retriever -> Lawyer -> (Judge ‖ Fact Checker ‖ Risk) -> Citation Verifier
+    -> Consensus -> Gate. No conclusion is returned unless verification passes.
+
+    SECURITY: inherits every existing control — injection scan on the way in,
+    nonce-fence isolation of the question inside the pipeline, mandatory citation
+    verification against the real corpus, and the output guard on the way out.
+    """
+    ip = _client_ip(request)
+    question = sanitize_untrusted((req.question or "").strip(), 4000)
+
+    if len(question) < 5:
+        raise HTTPException(status_code=422, detail="Please ask a legal question.")
+
+    # --- INPUT GATE (same guard as /chat — not a weaker one) ---
+    scan = scan_for_injection(question)
+    if scan.blocked:
+        audit.record(
+            "prompt_injection_blocked", endpoint="/verify-legal", ip=ip,
+            risk=scan.risk, categories=scan.categories, message=question[:500],
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=("This request was blocked by the security filter (prompt injection). "
+                    "Detected: " + ", ".join(scan.categories)),
+        )
+
+    try:
+        detected_arena = decide_arena(question, req.arena, classify_fn=predict_arena_auto)
+        where = build_where_for_category(detected_arena)
+
+        result = run_verified_legal_analysis(
+            question,
+            llm=llm,
+            retriever=hybrid_retriever,
+            registry=citation_registry,
+            where=where,
+            strict_citations=STRICT_CITATIONS,
+        )
+    except Exception:
+        logger.exception("verify_legal_endpoint error for question=%r", question[:200])
+        raise HTTPException(status_code=502, detail="Verification pipeline failed.")
+
+    payload = result.to_dict()
+    payload["detected_arena"] = detected_arena
+
+    # --- OUTPUT GATE: the same guard /chat uses (prompt-leak, unlawful content,
+    # credential leak). Verification does not exempt an answer from it.
+    if result.passed:
+        guarded = guard_output(result.verdict, registry=citation_registry,
+                               strict_citations=STRICT_CITATIONS)
+        if guarded.blocked:
+            audit.record("output_blocked", endpoint="/verify-legal", ip=ip,
+                         reasons=guarded.reasons)
+            payload["passed"] = False
+            payload["verdict"] = guarded.text
+            payload["gate_reasons"] = ["The generated answer failed the output guard."]
+        else:
+            payload["verdict"] = guarded.text
+
+    audit.record(
+        "legal_verification", endpoint="/verify-legal", ip=ip,
+        arena=detected_arena, passed=payload["passed"],
+        confidence=payload["confidence"],
+        source_trust_score=payload["source_trust_score"],
+        hallucinated=len(payload["hallucinated_citations"]),
+        elapsed_ms=payload["elapsed_ms"],
+    )
+    return payload
 
 
 @app.get("/login", response_class=HTMLResponse)
