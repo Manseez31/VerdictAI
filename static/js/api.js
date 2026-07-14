@@ -1,3 +1,12 @@
+// api.js — typed API client.
+//
+// All calls go through authFetch (session.js), which attaches the access token
+// when one exists and transparently refreshes it on 401. When auth is not
+// required, no session exists, no header is sent, and the open API behaves
+// exactly as before — so this is fully backward compatible.
+
+import { authFetch } from "./session.js";
+
 // api.js — the single boundary to the backend /chat endpoint.
 // The request/response contract is unchanged: POST { message, arena }
 // -> { answer, detected_arena, ok }.
@@ -20,7 +29,7 @@ export class ApiError extends Error {
 export async function sendChat(message, arena, { signal } = {}) {
   let res;
   try {
-    res = await fetch("/chat", {
+    res = await authFetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, arena }),
@@ -62,7 +71,7 @@ export async function sendChat(message, arena, { signal } = {}) {
 export async function translateText(text, { signal, targetLang = "en" } = {}) {
   let res;
   try {
-    res = await fetch("/translate", {
+    res = await authFetch("/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, target_lang: targetLang }),
@@ -100,7 +109,7 @@ export async function translateText(text, { signal, targetLang = "en" } = {}) {
 export async function simulateCase(payload, { signal } = {}) {
   let res;
   try {
-    res = await fetch("/simulate-case", {
+    res = await authFetch("/simulate-case", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -137,7 +146,7 @@ export async function simulateCase(payload, { signal } = {}) {
 export async function fetchCaseReportPdf(report, { signal } = {}) {
   let res;
   try {
-    res = await fetch("/simulate-case/pdf", {
+    res = await authFetch("/simulate-case/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),
@@ -159,7 +168,7 @@ export async function fetchCaseReportPdf(report, { signal } = {}) {
 export async function runCaseIntelligence(payload, { signal } = {}) {
   let res;
   try {
-    res = await fetch("/case-intelligence", {
+    res = await authFetch("/case-intelligence", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -181,7 +190,7 @@ export async function runCaseIntelligence(payload, { signal } = {}) {
 
 /** Fetch the educational demo scenarios. */
 export async function fetchDemoCases() {
-  const res = await fetch("/case-intelligence/demos");
+  const res = await authFetch("/case-intelligence/demos");
   if (!res.ok) throw new ApiError("Could not load demo cases.", "server");
   return (await res.json()).cases || [];
 }
@@ -192,7 +201,7 @@ export async function extractDocument(file, { signal } = {}) {
   form.append("file", file);
   let res;
   try {
-    res = await fetch("/extract-document", { method: "POST", body: form, signal });
+    res = await authFetch("/extract-document", { method: "POST", body: form, signal });
   } catch (err) {
     if (err.name === "AbortError") throw err;
     throw new ApiError("Couldn’t upload the file. Check your connection.", "network");

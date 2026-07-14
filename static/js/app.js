@@ -6,6 +6,7 @@ import { icon } from "./icons.js";
 import { initTheme, bindThemeToggles } from "./theme.js";
 import { ARENA_ORDER, arenaMeta, parseAnswer, deriveGrounding } from "./format.js";
 import { sendChat, translateText, ApiError } from "./api.js";
+import { getSession, guardPage, logout } from "./session.js";
 import { ConversationStore } from "./store.js";
 import { renderHistory } from "./components/sidebar.js";
 import { LandingState } from "./components/states.js";
@@ -369,11 +370,40 @@ function bindEvents() {
   });
 }
 
-function init() {
+/** Sidebar footer chip: who you are, your role, and a way out. */
+function renderSessionChip() {
+  const host = qs("#sessionChip");
+  if (!host) return;
+  clear(host);
+
+  const session = getSession();
+  if (!session) return;   // open mode (AUTH_REQUIRED=false) — nothing to show
+
+  host.append(
+    el("div", { class: "mb-2 flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-2.5 py-2 dark:bg-slate-800/60" }, [
+      el("div", { class: "min-w-0" }, [
+        el("p", { class: "truncate text-xs font-semibold capitalize text-slate-700 dark:text-slate-200" }, session.role),
+        el("p", { class: "text-[10px] text-slate-400 dark:text-slate-500" }, `${session.permissions.length} permissions`),
+      ]),
+      el("button", {
+        type: "button",
+        class: "shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-200 hover:text-rose-600 focus-ring dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-rose-400",
+        onClick: () => logout(),
+        "aria-label": "Sign out",
+      }, "Sign out"),
+    ])
+  );
+}
+
+async function init() {
   initTheme();
   bindThemeToggles();
+  // Redirects to /login ONLY when the server reports auth_required. In open
+  // mode this is a no-op, so the existing experience is unchanged.
+  await guardPage();
   populateArenaSelect();
   renderLangSetting();
+  renderSessionChip();
   bindEvents();
   renderSidebar();
   renderThread();

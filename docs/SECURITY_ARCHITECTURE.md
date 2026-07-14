@@ -180,15 +180,95 @@ CSP, HSTS (with `FORCE_HTTPS`), `X-Content-Type-Options: nosniff`,
 - Upload attacks: disguised executable, EICAR, oversize.
 - Audit: chain verification and **detection of a forged historical record**.
 
+## Authentication & RBAC (`auth/`)
+
+### Passwords — Argon2id
+Memory-hard KDF (OWASP params: 19 MiB, t=2, p=1). GPUs/ASICs cannot trade cheap
+parallelism for speed. Hashes are salted (identical passwords never collide),
+`verify()` never raises on a corrupt row, and `needs_rehash()` transparently
+upgrades stored hashes when cost parameters rise.
+
+### Sessions — JWT with refresh rotation + REUSE DETECTION
+
+This is the part that separates "we have refresh tokens" from "our refresh
+tokens are safe". Every refresh **consumes** the old token and issues a new one
+in the same *family*:
+
+```
+login        -> RT1  (family F)
+refresh(RT1) -> RT1 spent, issue RT2  (family F)
+refresh(RT2) -> RT2 spent, issue RT3  (family F)
+
+refresh(RT1) again  ->  REPLAY!  ->  revoke the ENTIRE family F
+```
+
+If a token is ever presented twice, either an attacker is replaying a stolen
+token or the victim is replaying one the attacker already spent. Either way the
+family is compromised, so **everything in it dies** — attacker and victim are
+both logged out and the theft becomes *visible* instead of silent. (OAuth 2.0
+Security BCP.)
+
+Other properties:
+- Access tokens are short-lived (15 min) and stateless — cheap, at the cost of a
+  ≤15-minute revocation window. Refresh tokens are stored **hashed**, so a DB
+  leak does not hand over usable sessions.
+- `typ` is asserted on decode: a refresh token can never be replayed as an access
+  token (confused-deputy).
+- **A short `JWT_SECRET` is a startup error**, not a warning — a forgeable token
+  is a total authentication bypass.
+- Refresh tokens live in an **httpOnly, SameSite=Strict** cookie: JS cannot read
+  them (XSS can't steal the long-lived credential) and the browser won't send
+  them cross-site (CSRF can't spend them).
+
+### RBAC — deny by default
+
+Endpoints depend on a **permission**, never a role, so moving a capability
+between roles never touches an endpoint (Open/Closed).
+
+| Role | Can | Explicitly cannot |
+|------|-----|-------------------|
+| **Admin** | everything, incl. user administration | — |
+| **Lawyer** | analyze cases, upload documents, view/export reports | read the audit log |
+| **Researcher** | search the legal DB, view citations | analyze cases, upload |
+| **Client** | limited case access, view reports | upload, analyze |
+| **Auditor** | read logs + security metrics | **case content, chat, analysis** |
+
+The Auditor restriction is deliberate separation of duties: an auditor inspects
+the *system's* behaviour, not the *clients'* matters.
+
+**The key property:** permissions are always re-derived server-side from the
+user's **current role in the database** — never trusted from the JWT's `role` or
+`perms` claim. So a forged claim grants nothing, and demoting or disabling a user
+takes effect on their **next request**, not whenever their token happens to
+expire. Tests lock both in.
+
+Every privilege change (role change, disable) is written to the tamper-evident
+audit log and revokes the target's sessions immediately.
+
+### Backward compatibility
+
+`AUTH_REQUIRED` (default **false**) governs enforcement. Off: the API stays open
+and every existing test and UI flow passes unchanged. On: guards enforce. This is
+the deliberate resolution of "enforced login" vs "preserve backward
+compatibility" — the full stack is present and tested either way; production
+flips one flag.
+
+### Account-enumeration resistance
+Login performs a password hash **even when the user does not exist**, and returns
+an identical error either way. Registration and password reset never confirm
+whether an address is known.
+
 ## NOT covered yet (be honest about the gaps)
 
 These were requested but are **not** implemented. Do not assume they exist:
 
-- ❌ **JWT authentication & RBAC** (Admin/Lawyer/Client/Researcher). The API is
-  still **unauthenticated** — anyone who can reach it can use it. This is the
-  biggest remaining gap for production.
+- ⚠️ **Email delivery.** Verification and password-reset tokens are minted,
+  hashed, single-use, and 1-hour-scoped — but there is **no SMTP integration**;
+  the token is written to the log for the deployer to wire up.
 - ❌ **OpenTelemetry / Prometheus / Grafana.** There is structured logging and a
   health check, but no metrics export or tracing.
+- ❌ **Multi-agent consensus engine, similar-case retrieval, evidence graph, red-team
+  dashboard** (Phases 2–10 of the platform roadmap).
 - ❌ **Real malware scanning** (hook only — no engine bundled).
 - ❌ **CSRF tokens.** The API is JSON-only with a strict CORS allow-list, which
   blocks classic form-CSRF; add tokens if cookie auth is introduced.

@@ -47,6 +47,12 @@ from security.headers import install_security_headers
 from security.output_guard import guard_output
 from security.prompt_guard import wrap_untrusted
 
+# ---- Authentication & RBAC (Phase 1) ----
+from fastapi import Depends
+from auth import Permission, Role, UserStore, require_permission, require_role
+from auth import routes as auth_routes
+from auth.deps import auth_required
+
 app = FastAPI()
 
 # Allow frontend (HTML) to call this API. Override with a comma-separated
@@ -73,6 +79,16 @@ install_security_headers(app)
 
 # Tamper-evident (hash-chained) audit log for every security-relevant decision.
 audit = AuditLog(os.getenv("AUDIT_LOG_PATH", "data/audit/audit.jsonl"))
+
+# Authentication store + /auth routes. Enforcement is governed by AUTH_REQUIRED
+# (default false) so the existing open API and UI keep working unchanged; the
+# guards below become active the moment it is set to true.
+user_store = UserStore(os.getenv("AUTH_DB_PATH", "data/auth/users.db"))
+auth_routes.init(user_store, audit)
+app.include_router(auth_routes.router)
+logger.info(
+    "Auth ready (AUTH_REQUIRED=%s, users=%d)", auth_required(), user_store.count()
+)
 
 # Ground truth for citation verification, built once from the live vector store.
 # This is what makes a hallucinated Act/section detectable rather than trusted.
@@ -222,11 +238,14 @@ def health():
             "output_guard": True,
             "audit_log": True,
             "strict_citations": STRICT_CITATIONS,
+            # Lets the frontend decide whether to enforce a login redirect.
+            "auth_required": auth_required(),
         },
     }
 
 
-@app.get("/security/audit/verify")
+@app.get("/security/audit/verify",
+         dependencies=[Depends(require_permission(Permission.AUDIT_READ))])
 def verify_audit_chain():
     """Verify the audit log's hash chain — detects any edit, deletion, or
     reordering of past records (tamper-evidence)."""
@@ -272,7 +291,8 @@ def log_evaluation(question: str, detected_arena: str, answer: str, context: str
         logger.exception("Eval logging error")
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse,
+          dependencies=[Depends(require_permission(Permission.CHAT_QUERY))])
 def chat_endpoint(req: ChatRequest, request: Request):
     fallback_answer = "माफ गर्नुहोस्, सिस्टममा एउटा समस्या आयो, कृपया पछि पुनः प्रयास गर्नुहोस्।"
     ip = _client_ip(request)
@@ -370,7 +390,8 @@ class TranslateResponse(BaseModel):
     translated_text: str
 
 
-@app.post("/translate", response_model=TranslateResponse)
+@app.post("/translate", response_model=TranslateResponse,
+          dependencies=[Depends(require_permission(Permission.CHAT_QUERY))])
 def translate_endpoint(req: TranslateRequest):
     text = (req.text or "").strip()
     target_lang = (req.target_lang or "en").strip().lower()
@@ -401,7 +422,8 @@ class CaseSimRequest(BaseModel):
     case_type: str = "Other"
 
 
-@app.post("/simulate-case")
+@app.post("/simulate-case",
+          dependencies=[Depends(require_permission(Permission.CASE_ANALYZE))])
 def simulate_case_endpoint(req: CaseSimRequest):
     title = (req.title or "").strip()
     description = (req.description or "").strip()
@@ -432,7 +454,8 @@ def simulate_case_endpoint(req: CaseSimRequest):
     return report
 
 
-@app.post("/simulate-case/pdf")
+@app.post("/simulate-case/pdf",
+          dependencies=[Depends(require_permission(Permission.REPORT_EXPORT))])
 def simulate_case_pdf_endpoint(report: Dict[str, Any] = Body(...)):
     """Render an already-generated simulation report to PDF.
 
@@ -475,13 +498,15 @@ class CaseIntelRequest(BaseModel):
     case_type: str = "Other"
 
 
-@app.get("/case-intelligence/demos")
+@app.get("/case-intelligence/demos",
+         dependencies=[Depends(require_permission(Permission.CHAT_QUERY))])
 def case_intelligence_demos():
     """The educational demo scenarios (Feature 12)."""
     return {"cases": DEMO_CASES}
 
 
-@app.post("/extract-document")
+@app.post("/extract-document",
+          dependencies=[Depends(require_permission(Permission.DOCUMENT_UPLOAD))])
 async def extract_document_endpoint(file: UploadFile = File(...), request: Request = None):
     """Extract plain text from an uploaded PDF/DOCX/TXT case file (Feature 1).
 
@@ -549,7 +574,8 @@ async def extract_document_endpoint(file: UploadFile = File(...), request: Reque
     }
 
 
-@app.post("/case-intelligence")
+@app.post("/case-intelligence",
+          dependencies=[Depends(require_permission(Permission.CASE_ANALYZE))])
 def case_intelligence_endpoint(req: CaseIntelRequest, request: Request):
     """Run the full multi-agent Case Intelligence Suite on a case.
 
@@ -681,6 +707,13 @@ def _secure_case_report(report: Dict[str, Any], scan) -> Dict[str, Any]:
 @app.get("/case-intelligence", response_class=HTMLResponse)
 def case_intelligence_page():
     page_path = Path(__file__).parent / "case-intelligence.html"
+    return HTMLResponse(content=page_path.read_text(encoding="utf-8"))
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    """Sign-in / registration page. Always reachable — it is how you get a token."""
+    page_path = Path(__file__).parent / "login.html"
     return HTMLResponse(content=page_path.read_text(encoding="utf-8"))
 
 
