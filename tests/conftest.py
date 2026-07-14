@@ -23,11 +23,16 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter():
-    """The rate limiter is process-global and counts per client IP. Every test
-    shares TestClient's IP, so without this the suite's own request volume trips
-    the 20/min limit and later tests fail with 429 — a test-isolation artifact,
-    not a product bug. Reset the window before each test.
+def reset_throttles():
+    """Reset the process-global spend/rate windows before each test.
+
+    Both the rate limiter and the token budget accumulate across the whole
+    process. Every test shares TestClient's IP, so without this the suite's own
+    request volume trips the limits and later tests fail with 429 — a
+    test-isolation artifact, not a product bug.
+
+    (The budget guard is doing exactly its job here: the test suite really does
+    look like one caller making hundreds of expensive requests a minute.)
     """
     try:
         import backend
@@ -39,4 +44,11 @@ def reset_rate_limiter():
     if limiter is not None:
         with limiter._lock:
             limiter._hits.clear()
+
+    guard = getattr(backend, "budget_guard", None)
+    if guard is not None:
+        for counter in ("global_budget", "principal_budget", "actual_budget"):
+            b = getattr(guard, counter, None)
+            if b is not None:
+                b.reset()
     yield

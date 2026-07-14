@@ -139,6 +139,63 @@ def test_verify_legal_surfaces_a_blocked_verdict(monkeypatch):
     assert "did not pass verification" in body["verdict"]
 
 
+# ---- F-3: token budget enforced at the endpoint ----
+
+def test_budget_exhaustion_returns_429_with_retry_after(monkeypatch):
+    """A caller who burns their token budget is refused BEFORE any LLM runs —
+    even though they are well within the 20-requests/minute rate limit."""
+    import backend as backend_module
+    from security.budget import BudgetGuard
+
+    # A budget so small that a single /verify-legal request cannot fit.
+    monkeypatch.setattr(
+        backend_module, "budget_guard",
+        BudgetGuard(global_tokens_per_min=1_000_000, principal_tokens_per_min=100),
+    )
+
+    resp = client.post("/verify-legal", json={"question": "Is registration required?"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+    assert "token budget" in resp.json()["detail"].lower()
+
+
+def test_budget_check_fails_closed(monkeypatch):
+    """A wallet guard that fails open is not a guard. If the budget cannot be
+    evaluated, the request is refused (503), not waved through."""
+    import backend as backend_module
+
+    class Broken:
+        def check(self, *a, **k):
+            raise RuntimeError("budget backend down")
+
+    monkeypatch.setattr(backend_module, "budget_guard", Broken())
+    resp = client.post("/chat", json={"message": "what does the pharmacy act say"})
+    assert resp.status_code == 503
+
+
+def test_chat_surfaces_budget_rejection_as_429_not_a_fake_200(monkeypatch):
+    """REGRESSION. /chat wraps its body in a blanket `except Exception` that
+    returns 200 with ok=false. That handler was swallowing the budget's
+    HTTPException, so a spend rejection reached the client disguised as an
+    ordinary model failure — and the client would happily retry."""
+    import backend as backend_module
+    from security.budget import BudgetGuard
+
+    monkeypatch.setattr(
+        backend_module, "budget_guard",
+        BudgetGuard(global_tokens_per_min=1_000_000, principal_tokens_per_min=1),
+    )
+    resp = client.post("/chat", json={"message": "what does the pharmacy act say"})
+    assert resp.status_code == 429, "budget rejection was masked as a 200"
+
+
+def test_health_exposes_budget_posture():
+    body = client.get("/health").json()
+    assert "budget" in body
+    assert body["budget"]["global_actual_limit"] > 0
+    assert body["budget"]["enabled"] == 1
+
+
 def test_chat_endpoint_is_unchanged_by_phase_2():
     """Backward compatibility: /chat must not have gained the verification
     contract. Phase 2 is additive."""

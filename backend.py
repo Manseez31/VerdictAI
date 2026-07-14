@@ -43,6 +43,7 @@ from translation import translate_text, translate_to_english
 
 # ---- Security & Trust Core ----
 from security import AuditLog, UnsafeUpload, sanitize_untrusted, scan_for_injection, validate_upload
+from security.budget import BudgetExceeded, BudgetGuard, TokenAccountant
 from security.citation_verifier import CitationRegistry
 from security.headers import install_security_headers
 from security.output_guard import guard_output
@@ -52,7 +53,7 @@ from security.prompt_guard import wrap_untrusted
 from fastapi import Depends
 from auth import Permission, Role, UserStore, require_permission, require_role
 from auth import routes as auth_routes
-from auth.deps import auth_required
+from auth.deps import auth_required, get_current_user_optional
 
 app = FastAPI()
 
@@ -138,6 +139,57 @@ STRICT_CITATIONS = os.getenv("STRICT_CITATIONS", "false").strip().lower() in {"1
 
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
+
+
+# ---- F-3: token/spend budget (denial-of-wallet) ----
+# The per-IP request limiter below counts REQUESTS; this counts TOKENS, which is
+# the unit that actually costs money. See security/budget.py.
+budget_guard = BudgetGuard()
+token_accountant = TokenAccountant(budget_guard)
+
+# Attach the accountant to every LLM so the provider's real token counts are
+# metered no matter which agent made the call.
+for _llm in (llm, judge_llm):
+    try:
+        _llm.callbacks = list(_llm.callbacks or []) + [token_accountant]
+    except Exception:  # noqa: BLE001 — metering must never block startup
+        logger.exception("Could not attach token accountant to an LLM")
+
+
+def _principal(request: Request) -> str:
+    """Budget key: the authenticated user when we have one, else the client IP.
+
+    A user id is far harder to rotate than an IP, so an authenticated deployment
+    gets a budget key an attacker cannot cheaply spin up. When auth is disabled
+    we fall back to IP, which is weak — that weakness is precisely why auth is
+    now on by default (F-1).
+    """
+    user = get_current_user_optional(request)
+    return f"user:{user.id}" if user else f"ip:{_client_ip(request)}"
+
+
+def _enforce_budget(request: Request, user_input: str) -> None:
+    """Pre-flight budget check. FAILS CLOSED: any error denies the request,
+    because a wallet guard that fails open is not a guard."""
+    try:
+        budget_guard.check(_principal(request), request.url.path, user_input)
+    except BudgetExceeded as exc:
+        audit.record(
+            "token_budget_exceeded", endpoint=request.url.path,
+            principal=_principal(request), scope=exc.scope,
+        )
+        raise HTTPException(
+            status_code=429, detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Budget check failed — denying request (fail closed)")
+        raise HTTPException(
+            status_code=503,
+            detail="Spend protection is unavailable; the request was refused.",
+        )
 
 
 # ---- Basic per-IP rate limiting for /chat (protects the paid Groq API key) ----
@@ -274,6 +326,8 @@ def health():
             # Lets the frontend decide whether to enforce a login redirect.
             "auth_required": auth_required(),
         },
+        # F-3: live spend posture. Useful for ops and for proving the guard is on.
+        "budget": {**budget_guard.snapshot(), **token_accountant.stats()},
     }
 
 
@@ -333,6 +387,10 @@ def chat_endpoint(req: ChatRequest, request: Request):
     try:
         # --- INPUT GATE: prompt injection / jailbreak detection ---
         message = sanitize_untrusted(req.message, max_chars=4000)
+
+        # --- BUDGET GATE (before any LLM call) ---
+        _enforce_budget(request, message)
+
         scan = scan_for_injection(message)
         if scan.blocked:
             audit.record(
@@ -403,6 +461,13 @@ def chat_endpoint(req: ChatRequest, request: Request):
             ),
         )
 
+    except HTTPException:
+        # Deliberate HTTP outcomes (429 budget exceeded, 503 fail-closed) must
+        # reach the client as themselves. The blanket handler below would
+        # otherwise convert them into a 200 with ok=false, silently masking a
+        # spend rejection as an ordinary model failure — a test caught exactly
+        # this.
+        raise
     except Exception:
         logger.exception("chat_endpoint error for message=%r", req.message[:200])
         return ChatResponse(answer=fallback_answer, detected_arena="All (auto)", ok=False)
@@ -425,7 +490,7 @@ class TranslateResponse(BaseModel):
 
 @app.post("/translate", response_model=TranslateResponse,
           dependencies=[Depends(require_permission(Permission.CHAT_QUERY))])
-def translate_endpoint(req: TranslateRequest):
+def translate_endpoint(req: TranslateRequest, request: Request):
     text = (req.text or "").strip()
     target_lang = (req.target_lang or "en").strip().lower()
     if not text:
@@ -434,6 +499,8 @@ def translate_endpoint(req: TranslateRequest):
         raise HTTPException(status_code=422, detail="target_lang must be 'en' or 'ne'")
     if len(text) > 12000:
         raise HTTPException(status_code=413, detail="text too long to translate")
+
+    _enforce_budget(request, text)
 
     try:
         translated = translate_text(text, target_lang=target_lang)
@@ -457,7 +524,7 @@ class CaseSimRequest(BaseModel):
 
 @app.post("/simulate-case",
           dependencies=[Depends(require_permission(Permission.CASE_ANALYZE))])
-def simulate_case_endpoint(req: CaseSimRequest):
+def simulate_case_endpoint(req: CaseSimRequest, request: Request):
     title = (req.title or "").strip()
     description = (req.description or "").strip()
     jurisdiction = (req.jurisdiction or "").strip() or "Nepal"
@@ -472,6 +539,8 @@ def simulate_case_endpoint(req: CaseSimRequest):
         )
     if len(description) > 8000:
         raise HTTPException(status_code=413, detail="case description too long (max 8000 characters)")
+
+    _enforce_budget(request, f"{title} {description}")
 
     try:
         report = run_case_simulation({
@@ -636,6 +705,9 @@ def case_intelligence_endpoint(req: CaseIntelRequest, request: Request):
     if len(description) > 12000:
         raise HTTPException(status_code=413, detail="case description too long (max 12000 characters)")
 
+    # --- BUDGET GATE (before any of the 8 agents run) ---
+    _enforce_budget(request, f"{title}\n{description}")
+
     # --- INPUT GATE ---
     scan = scan_for_injection(f"{title}\n{description}")
     if scan.blocked:
@@ -769,6 +841,9 @@ def verify_legal_endpoint(req: VerifyRequest, request: Request):
 
     if len(question) < 5:
         raise HTTPException(status_code=422, detail="Please ask a legal question.")
+
+    # --- BUDGET GATE (this endpoint is ~5 LLM calls; gate before any of them) ---
+    _enforce_budget(request, question)
 
     # --- INPUT GATE (same guard as /chat — not a weaker one) ---
     scan = scan_for_injection(question)
