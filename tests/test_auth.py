@@ -272,6 +272,31 @@ def test_public_view_never_leaks_password_hash(user):
     assert "password_hash" not in user.to_public()
 
 
+def test_auth_secure_by_default(monkeypatch):
+    """F-1 REGRESSION GUARD.
+
+    Auth previously defaulted to OFF, so a deployment that merely forgot to set
+    AUTH_REQUIRED served every expensive LLM endpoint to the internet. Opening
+    the API must be a deliberate act, never an omission.
+    """
+    from auth.deps import auth_required
+
+    monkeypatch.delenv("AUTH_REQUIRED", raising=False)
+    assert auth_required() is True, "auth must fail CLOSED when unconfigured"
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("false", False), ("0", False), ("no", False),      # explicit opt-out only
+    ("true", True), ("1", True), ("", True),            # anything else stays closed
+    ("garbage", True),
+])
+def test_auth_only_opens_on_explicit_optout(monkeypatch, value, expected):
+    from auth.deps import auth_required
+
+    monkeypatch.setenv("AUTH_REQUIRED", value)
+    assert auth_required() is expected
+
+
 def test_short_jwt_secret_is_rejected(monkeypatch):
     """A short HMAC secret is brute-forceable, and a forged token is a total
     auth bypass — so fail fast at startup rather than sign weakly."""

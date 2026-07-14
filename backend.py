@@ -87,9 +87,41 @@ audit = AuditLog(os.getenv("AUDIT_LOG_PATH", "data/audit/audit.jsonl"))
 user_store = UserStore(os.getenv("AUTH_DB_PATH", "data/auth/users.db"))
 auth_routes.init(user_store, audit)
 app.include_router(auth_routes.router)
-logger.info(
-    "Auth ready (AUTH_REQUIRED=%s, users=%d)", auth_required(), user_store.count()
-)
+
+
+def _validate_auth_config() -> None:
+    """Startup gate for the auth configuration.
+
+    Two failure modes, handled differently because their consequences differ:
+
+    * Auth ON but no JWT_SECRET  -> HARD FAIL. tokens.py would otherwise mint an
+      ephemeral per-process secret, silently invalidating every session on
+      restart. A security control that appears to work but doesn't is worse than
+      one that is plainly off, so we refuse to start.
+
+    * Auth OFF -> start, but shout. This is a legitimate local-dev mode, and it
+      is exactly the configuration that left every expensive LLM endpoint open to
+      the internet (finding F-1). It must never be reachable by accident or
+      silently.
+    """
+    if auth_required():
+        if not os.getenv("JWT_SECRET"):
+            raise RuntimeError(
+                "AUTH_REQUIRED is enabled but JWT_SECRET is not set. Refusing to start: "
+                "an ephemeral signing key would invalidate all sessions on restart. "
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+        logger.info("Auth ENFORCED (users=%d)", user_store.count())
+    else:
+        logger.critical(
+            "AUTH IS DISABLED (AUTH_REQUIRED=false). Every expensive LLM endpoint "
+            "(/chat, /case-intelligence, /verify-legal, /extract-document) is OPEN "
+            "and can be called by anyone who can reach this port, at your expense. "
+            "This is acceptable for local development ONLY. Never deploy like this."
+        )
+
+
+_validate_auth_config()
 
 # Ground truth for citation verification, built once from the live vector store.
 # This is what makes a hallucinated Act/section detectable rather than trusted.

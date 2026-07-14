@@ -41,7 +41,24 @@ logger = logging.getLogger(__name__)
 
 
 def auth_required() -> bool:
-    return os.getenv("AUTH_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    """Is authentication enforced?
+
+    SECURE BY DEFAULT (changed in the F-1 security fix). Previously this
+    defaulted to `false`, which meant a deployment that simply forgot to set the
+    variable served /chat, /case-intelligence and /verify-legal to the entire
+    internet — an unauthenticated denial-of-wallet on a paid LLM API.
+
+    Every other control in this codebase fails closed; this one failed open. It
+    now defaults to `true`. Opening the API is a deliberate act (AUTH_REQUIRED=false),
+    not something you can do by omission.
+
+    NOTE the inverted test: we check for an explicit OPT-OUT rather than for an
+    opt-in. Matching a truthy set (`in {"1","true",...}`) would mean a typo —
+    `AUTH_REQUIRED=ture` — silently disables authentication. Unrecognized values
+    must fail CLOSED, not open.
+    """
+    raw = os.getenv("AUTH_REQUIRED", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 # Wired by backend.py at startup (single shared store).
