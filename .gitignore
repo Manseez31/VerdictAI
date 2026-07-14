@@ -31,6 +31,15 @@ data/eval/results/
 data/rag_evaluation_log_ui.csv
 data/rag_evaluation_log.csv
 
+# Audit log — contains client IPs and request metadata. Never commit.
+data/audit/
+
+# Local user database (password hashes, tokens). Never commit.
+data/auth/
+*.db
+*.sqlite3
+!data/vector_store/chroma.sqlite3
+
 # ---- Editors / OS ----
 .DS_Store
 Thumbs.db

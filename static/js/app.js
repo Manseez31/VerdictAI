@@ -215,6 +215,9 @@ async function handleSend(text, arenaOverride) {
       arena: data.detected_arena,
       uniqueCitations,
       grounding,
+      // Trust/verification block from the backend's output guard: how many of
+      // this answer's citations were substantiated against the real corpus.
+      security: data.security || null,
     });
 
     // Swap the loading bubble for a streaming assistant message.

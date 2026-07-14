@@ -44,6 +44,43 @@ function assistantHeader(arena) {
   ]);
 }
 
+/**
+ * Citation-verification badge (Security & Trust Core).
+ *
+ * Every [स्रोत: …] tag in an answer is checked against the actual indexed
+ * corpus server-side. This surfaces the result so a fabricated statute can
+ * never be presented with the same authority as a real one.
+ */
+function VerificationBadge(security) {
+  if (!security || !security.citations_total) return null;
+
+  const { source_trust_score: score, citations_verified: ok, citations_total: total } = security;
+  const bad = security.hallucinated_citations || [];
+
+  const tone =
+    score >= 100
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-400/25"
+      : score >= 50
+      ? "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-400/25"
+      : "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-950/60 dark:text-rose-300 dark:ring-rose-400/25";
+
+  const label =
+    score >= 100 ? "All citations verified" : `${ok}/${total} citations verified`;
+
+  const title = bad.length
+    ? `Could not verify against the legal corpus: ${bad.join("; ")}`
+    : "Every cited Act and section was matched against the indexed legal corpus.";
+
+  return el("span", {
+    class: `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${tone}`,
+    title,
+    "aria-label": `${label}. Source trust score ${score} out of 100.`,
+  }, [
+    el("span", { html: icon(score >= 100 ? "shield" : "alert", "w-3 h-3") }),
+    label,
+  ]);
+}
+
 // Shared class for small action buttons under an answer.
 const ACTION_BTN =
   "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition-colors " +
@@ -170,6 +207,8 @@ export function AssistantMessage(msg, { animate = false, onTranslate, onPersist 
 
   function renderControls() {
     clear(controlsEl);
+    const badge = VerificationBadge(msg.security);
+    if (badge) controlsEl.append(badge);
     controlsEl.append(copyButton());
 
     if (translating) {
