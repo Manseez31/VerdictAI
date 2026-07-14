@@ -5,7 +5,7 @@ import datetime
 import json
 
 import rag_pipeline
-from rag_pipeline import llm as judge_llm, rag_retriever, llm, rag_with_context
+from rag_pipeline import judge_llm, rag_retriever, llm, rag_with_context
 
 OUT_CSV = "data/rag_evaluation_log.csv"
 

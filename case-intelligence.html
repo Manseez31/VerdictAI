@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Case Intelligence · VerdictAI</title>
+  <meta name="description" content="Legal Case Intelligence Suite: multi-agent, RAG-grounded case analysis — analyzer, evidence, research, prosecution, defense, judge, verdict, and timeline." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="/static/theme-config.js"></script>
+  <link rel="stylesheet" href="/static/base.css" />
+</head>
+
+<body class="h-full bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <div class="flex min-h-dvh flex-col">
+    <!-- Header -->
+    <header class="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur-md lg:px-8 dark:border-slate-800 dark:bg-slate-900/80">
+      <div class="flex min-w-0 items-center gap-3">
+        <a href="/" class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-ring dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Back to chat">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          Chat
+        </a>
+        <span class="h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true"></span>
+        <div class="flex items-center gap-2.5">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-sm">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 3 21 8 12 13 3 8 12 3"/><polyline points="3 13 12 18 21 13"/></svg>
+          </span>
+          <div class="min-w-0">
+            <h1 class="font-display text-base font-semibold leading-tight tracking-tight text-slate-900 dark:text-white">Case Intelligence</h1>
+            <p class="hidden text-[11px] font-medium uppercase tracking-wider text-slate-400 sm:block dark:text-slate-500">Multi-agent legal reasoning</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <!-- Bilingual toggle (Feature 10) -->
+        <div id="langToggle" class="hidden"></div>
+        <span class="hidden items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 md:inline-flex dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-300">
+          Educational — not legal advice
+        </span>
+        <button data-theme-toggle class="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 focus-ring dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Toggle theme"></button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="mx-auto grid w-full max-w-7xl flex-1 gap-6 px-4 py-6 lg:grid-cols-[400px_minmax(0,1fr)] lg:px-8">
+      <!-- Case input -->
+      <section aria-label="Case input" class="lg:sticky lg:top-[5.5rem] lg:self-start">
+        <form id="caseForm" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-sm font-bold text-slate-800 dark:text-slate-100">Case input</h2>
+            <div class="relative">
+              <select id="demoPicker" class="cursor-pointer appearance-none rounded-md border-slate-300 bg-white py-1 pl-2 pr-7 text-xs font-medium text-brand-600 focus-ring dark:border-slate-700 dark:bg-slate-950 dark:text-brand-300">
+                <option value="">Load demo…</option>
+              </select>
+              <svg class="pointer-events-none absolute right-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+
+          <label for="caseTitle" class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Case title</label>
+          <input id="caseTitle" type="text" required minlength="3" maxlength="200" placeholder="e.g. Fake Investment Scheme"
+            class="mb-3 w-full rounded-lg border-slate-300 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-400 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+
+          <div class="mb-3 grid grid-cols-2 gap-3">
+            <div>
+              <label for="caseType" class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Case type</label>
+              <select id="caseType" class="w-full cursor-pointer rounded-lg border-slate-300 bg-white text-sm text-slate-800 focus:border-brand-400 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <option>Fraud</option><option>Cybercrime</option><option>Financial Scam</option>
+                <option>Murder</option><option>Property Dispute</option><option>Contract Dispute</option>
+                <option>Employment Dispute</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="caseJurisdiction" class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Jurisdiction</label>
+              <input id="caseJurisdiction" type="text" maxlength="100" value="Nepal"
+                class="w-full rounded-lg border-slate-300 bg-white text-sm text-slate-800 focus:border-brand-400 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+            </div>
+          </div>
+
+          <div class="mb-1 flex items-center justify-between">
+            <label for="caseDescription" class="block text-xs font-semibold text-slate-500 dark:text-slate-400">Case description</label>
+            <!-- Document upload (Feature 1) -->
+            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50 focus-within:outline focus-within:outline-2 focus-within:outline-brand-500 dark:text-brand-300 dark:hover:bg-brand-950/60">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><polyline points="7 8 12 3 17 8"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+              <span id="uploadLabel">Upload PDF/DOCX</span>
+              <input id="fileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" class="sr-only" />
+            </label>
+          </div>
+          <textarea id="caseDescription" required minlength="30" maxlength="12000" rows="9"
+            placeholder="Describe the hypothetical scenario, or upload a document to auto-fill this field…"
+            class="mb-1 w-full resize-y rounded-lg border-slate-300 bg-white text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-brand-400 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"></textarea>
+          <p id="charCount" class="mb-4 text-right text-[11px] text-slate-400 dark:text-slate-500"></p>
+
+          <button id="runBtn" type="submit"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-ring disabled:cursor-not-allowed disabled:opacity-60"></button>
+
+          <p class="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <svg class="mt-px h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3.1 7.6-7 9-3.9-1.4-7-4.4-7-9V6z"/><polyline points="9 12 11 14 15 10"/></svg>
+            Educational analysis of hypothetical scenarios only. This tool will not assist with committing crimes, evading law enforcement, or destroying evidence.
+          </p>
+        </form>
+      </section>
+
+      <!-- Results dashboard -->
+      <section id="results" aria-label="Case intelligence dashboard" aria-live="polite" class="min-w-0"></section>
+    </main>
+  </div>
+
+  <noscript>
+    <div style="padding:2rem;text-align:center;font-family:sans-serif">Case Intelligence requires JavaScript. Please enable it in your browser.</div>
+  </noscript>
+
+  <script type="module" src="/static/js/intelligence.js"></script>
+</body>
+</html>

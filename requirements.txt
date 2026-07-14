@@ -1,6 +1,7 @@
 langchain
 langchain-community
 langchain-core
+langchain-text-splitters
 pypdf
 pymupdf
 sentence-transformers
@@ -8,3 +9,8 @@ faiss-cpu
 chromadb
 langchain-groq
 python-dotenv
+fastapi
+uvicorn[standard]
+joblib
+scikit-learn
+pandas

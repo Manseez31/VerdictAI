@@ -1,0 +1,246 @@
+{
+  "relevance_level": "source_file",
+  "description": "Source/Act-level relevance proxy generated from arena_dataset.csv. A chunk is relevant iff its source_file is one of relevant_source_files. Optional relevant_chunk_ids / relevant_section_numbers may be added per query for higher-fidelity evaluation.",
+  "queries": [
+    {
+      "id": "q001",
+      "query": "फार्मेसी व्यवसाय दर्ता कसरी हुन्छ?",
+      "expected_arena": "Pharmacy Act",
+      "relevant_source_files": [
+        "pharmacy.pdf"
+      ]
+    },
+    {
+      "id": "q002",
+      "query": "फार्मेसी परिषद् मा कति वर्षको लाइसेन्स नवीकरण गर्नुपर्छ?",
+      "expected_arena": "Pharmacy Act",
+      "relevant_source_files": [
+        "pharmacy.pdf"
+      ]
+    },
+    {
+      "id": "q003",
+      "query": "pharmacy license kasari linu parcha?",
+      "expected_arena": "Pharmacy Act",
+      "relevant_source_files": [
+        "pharmacy.pdf"
+      ]
+    },
+    {
+      "id": "q004",
+      "query": "pharmacy council le license dina ke ke criteria chahinxa?",
+      "expected_arena": "Pharmacy Act",
+      "relevant_source_files": [
+        "pharmacy.pdf"
+      ]
+    },
+    {
+      "id": "q005",
+      "query": "दवाई पसल सञ्चालन गर्न के–के मापदण्ड चाहिन्छ?",
+      "expected_arena": "Pharmacy Act",
+      "relevant_source_files": [
+        "pharmacy.pdf"
+      ]
+    },
+    {
+      "id": "q006",
+      "query": "खोप ऐन, २०७२ कहिले लागू भयो?",
+      "expected_arena": "Immunization Act",
+      "relevant_source_files": [
+        "immunization.pdf"
+      ]
+    },
+    {
+      "id": "q007",
+      "query": "खोप कार्यक्रम को जिम्मेवारी कसको हुन्छ?",
+      "expected_arena": "Immunization Act",
+      "relevant_source_files": [
+        "immunization.pdf"
+      ]
+    },
+    {
+      "id": "q008",
+      "query": "immunization schedule kasari banauxan?",
+      "expected_arena": "Immunization Act",
+      "relevant_source_files": [
+        "immunization.pdf"
+      ]
+    },
+    {
+      "id": "q009",
+      "query": "खोप लगाउने उमेर र मापदण्डबारे जानकारी दिनुहोस्।",
+      "expected_arena": "Immunization Act",
+      "relevant_source_files": [
+        "immunization.pdf"
+      ]
+    },
+    {
+      "id": "q010",
+      "query": "खोप सम्बन्धि कानुनी दायित्व के-के छन्?",
+      "expected_arena": "Immunization Act",
+      "relevant_source_files": [
+        "immunization.pdf"
+      ]
+    },
+    {
+      "id": "q011",
+      "query": "नेपालको संविधानले स्वास्थ्य अधिकारबारे के भन्छ?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q012",
+      "query": "fundamental rights health sambandhi barema bataidinuhos",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q013",
+      "query": "संविधानमा नागरिकको स्वास्थ्य सेवामा पहुँचबारे के व्यवस्था छ?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q014",
+      "query": "public health sambandhi constitutional provision kei cha?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q015",
+      "query": "nepali nagrita lina k garna parxa?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q016",
+      "query": "nepali nagrita kasari lina sakinxa?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q017",
+      "query": "citizenship ko lagi ke kyaida chan?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q018",
+      "query": "नागरिकता लिने कानुनी प्रक्रिया के हो?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q019",
+      "query": "citizenship sambandhi byabastha kasari cha?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q020",
+      "query": "who can get nepali citizenship?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q021",
+      "query": "नेपालको संविधानमा नागरिकता सम्बन्धी के व्यवस्था छ?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q022",
+      "query": "नागरिकता प्राप्तिको मापदण्ड के–के छन्?",
+      "expected_arena": "Constitution of Nepal",
+      "relevant_source_files": [
+        "constitution.pdf"
+      ]
+    },
+    {
+      "id": "q023",
+      "query": "एकल महिलाको अधिकार के–के छन्?",
+      "expected_arena": "Single Women Act",
+      "relevant_source_files": [
+        "single_women.pdf"
+      ]
+    },
+    {
+      "id": "q024",
+      "query": "single women lai kasto sahayog dine vaneko xa?",
+      "expected_arena": "Single Women Act",
+      "relevant_source_files": [
+        "single_women.pdf"
+      ]
+    },
+    {
+      "id": "q025",
+      "query": "एकल महिला भत्ता कसरी पाउने?",
+      "expected_arena": "Single Women Act",
+      "relevant_source_files": [
+        "single_women.pdf"
+      ]
+    },
+    {
+      "id": "q026",
+      "query": "एकल महिलामाथि हुने हिंसाबारे कानुनी सुरक्षा के छ?",
+      "expected_arena": "Single Women Act",
+      "relevant_source_files": [
+        "single_women.pdf"
+      ]
+    },
+    {
+      "id": "q027",
+      "query": "राष्ट्रिय खेलकुद परिषद् सम्बन्धी व्यवस्था के हुन्?",
+      "expected_arena": "Sports Act",
+      "relevant_source_files": [
+        "sports.pdf"
+      ]
+    },
+    {
+      "id": "q028",
+      "query": "sports development kina chahinxa?",
+      "expected_arena": "Sports Act",
+      "relevant_source_files": [
+        "sports.pdf"
+      ]
+    },
+    {
+      "id": "q029",
+      "query": "खेलाडीहरूको हक अधिकार के-कस्ता छन्?",
+      "expected_arena": "Sports Act",
+      "relevant_source_files": [
+        "sports.pdf"
+      ]
+    },
+    {
+      "id": "q030",
+      "query": "खेलकुद संघ दर्ता कसरी गर्ने?",
+      "expected_arena": "Sports Act",
+      "relevant_source_files": [
+        "sports.pdf"
+      ]
+    }
+  ]
+}

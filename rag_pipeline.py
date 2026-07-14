@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from pathlib import Path
@@ -17,6 +18,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 
 # -------------------------------------------------------------------
 # 1) PDF loading & splitting helpers (for index-building scripts)
@@ -31,7 +34,7 @@ def process_all_pdfs(pdf_directory: str) -> List[Any]:
     all_documents: List[Any] = []
     pdf_dir = Path(pdf_directory)
     pdf_files = list(pdf_dir.glob("**/*.pdf"))
-    print(f"Found {len(pdf_files)} PDF files to process")
+    logger.info(f"Found {len(pdf_files)} PDF files to process")
 
     act_name_map = {
         "pharmacy.pdf": "Nepal Pharmacy Council Act, 2057",
@@ -42,7 +45,7 @@ def process_all_pdfs(pdf_directory: str) -> List[Any]:
     }
 
     for pdf_file in pdf_files:
-        print(f"\nProcessing: {pdf_file.name}")
+        logger.info(f"\nProcessing: {pdf_file.name}")
         try:
             loader = PyPDFLoader(str(pdf_file))
             documents = loader.load()
@@ -52,11 +55,11 @@ def process_all_pdfs(pdf_directory: str) -> List[Any]:
                 doc.metadata["file_type"] = "pdf"
                 doc.metadata["act_name"] = act_name
             all_documents.extend(documents)
-            print(f"Loaded {len(documents)} pages")
+            logger.info(f"Loaded {len(documents)} pages")
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
 
-    print(f"\nTotal documents loaded: {len(all_documents)}")
+    logger.info(f"\nTotal documents loaded: {len(all_documents)}")
     return all_documents
 
 
@@ -79,7 +82,7 @@ def load_all_acts() -> List[Any]:
     for spec in pdf_specs:
         # IMPORTANT: project‑relative path (assuming you run from project root)
         pdf_path = f"data/pdf/{spec['filename']}"
-        print(f"Loading {spec['filename']} ...")
+        logger.info(f"Loading {spec['filename']} ...")
         try:
             loader = PyPDFLoader(pdf_path)
             pdf_docs = loader.load()
@@ -88,11 +91,11 @@ def load_all_acts() -> List[Any]:
                 d.metadata["source_file"] = spec["filename"]
                 d.metadata["file_type"] = "pdf"
             docs.extend(pdf_docs)
-            print(f"  Loaded {len(pdf_docs)} pages")
+            logger.info(f"  Loaded {len(pdf_docs)} pages")
         except Exception as e:
-            print(f"  Error loading {spec['filename']}: {e}")
+            logger.error(f"  Error loading {spec['filename']}: {e}")
 
-    print(f"Loaded {len(docs)} documents (pages) from PDFs")
+    logger.info(f"Loaded {len(docs)} documents (pages) from PDFs")
     return docs
 
 
@@ -126,11 +129,11 @@ def split_documents(
         if match:
             doc.metadata["section_number"] = match.group(1)
 
-    print(f"Split {len(documents)} documents into {len(split_docs)} chunks")
+    logger.info(f"Split {len(documents)} documents into {len(split_docs)} chunks")
     if split_docs:
-        print("\nExample chunk:")
-        print(f"Content: {split_docs[0].page_content[:200]}...")
-        print(f"Metadata: {split_docs[0].metadata}")
+        logger.info("\nExample chunk:")
+        logger.info(f"Content: {split_docs[0].page_content[:200]}...")
+        logger.info(f"Metadata: {split_docs[0].metadata}")
 
     return split_docs
 
@@ -159,18 +162,18 @@ class EmbeddingManager:
     
     def load_model(self):
         try:
-            print(f"Loading embedding model: {self.model_name} on {self.device}")
+            logger.info(f"Loading embedding model: {self.model_name} on {self.device}")
             self.model = SentenceTransformer(self.model_name, device=self.device)
             dim = self.model.get_sentence_embedding_dimension()
-            print(f"Model loaded successfully. Embedding dimension: {dim}")
+            logger.info(f"Model loaded successfully. Embedding dimension: {dim}")
         except Exception as e:
-            print(f"Error loading model {self.model_name}: {e}")
+            logger.error(f"Error loading model {self.model_name}: {e}")
             raise
     
     def generate_embeddings(self, texts: List[str]) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not loaded")
-        print(f"Generating embeddings for {len(texts)} texts...")
+        logger.debug(f"Generating embeddings for {len(texts)} texts...")
         embeddings = self.model.encode(
             texts,
             batch_size=self.batch_size,
@@ -178,7 +181,7 @@ class EmbeddingManager:
             convert_to_numpy=True,
             normalize_embeddings=self.normalize_embeddings,
         )
-        print(f"Generated embeddings with shape: {embeddings.shape}")
+        logger.debug(f"Generated embeddings with shape: {embeddings.shape}")
         return embeddings
 
 
@@ -193,7 +196,7 @@ class VectorStore:
     def __init__(
         self,
         collection_name: str = "pdf_documents_v2",  # new name to avoid mixing old embeddings
-        persist_directory: str = "/Users/rijuphaiju/Documents/ytrag/data/vector_store",
+        persist_directory: str = str(Path(__file__).parent / "data" / "vector_store"),
         reset: bool = False,  # if True, delete existing collection on init
     ):
         self.collection_name = collection_name
@@ -212,7 +215,7 @@ class VectorStore:
             if self.reset:
                 try:
                     self.client.delete_collection(self.collection_name)
-                    print(f"Deleted existing collection: {self.collection_name}")
+                    logger.info(f"Deleted existing collection: {self.collection_name}")
                 except Exception:
                     # If it doesn't exist yet, ignore
                     pass
@@ -225,16 +228,16 @@ class VectorStore:
                     "hnsw:space": "cosine",  # important if you want cosine similarity
                 },
             )
-            print(f"Vector store initialized. Collection: {self.collection_name}")
-            print(f"Existing documents in collection: {self.collection.count()}")
+            logger.info(f"Vector store initialized. Collection: {self.collection_name}")
+            logger.info(f"Existing documents in collection: {self.collection.count()}")
         except Exception as e:
-            print(f"Error initializing vector store: {e}")
+            logger.error(f"Error initializing vector store: {e}")
             raise
 
     def add_documents(self, documents: List[Any], embeddings: np.ndarray):
         if len(documents) != len(embeddings):
             raise ValueError("Number of documents must match number of embeddings")
-        print(f"Adding {len(documents)} documents to vector store...")
+        logger.info(f"Adding {len(documents)} documents to vector store...")
 
         ids = []
         metadatas = []
@@ -260,10 +263,10 @@ class VectorStore:
                 metadatas=metadatas,
                 documents=documents_text,
             )
-            print(f"Successfully added {len(documents)} documents to vector store")
-            print(f"Total documents in collection: {self.collection.count()}")
+            logger.info(f"Successfully added {len(documents)} documents to vector store")
+            logger.info(f"Total documents in collection: {self.collection.count()}")
         except Exception as e:
-            print(f"Error adding documents to vector store: {e}")
+            logger.error(f"Error adding documents to vector store: {e}")
             raise
 
 
@@ -285,8 +288,8 @@ class RAGRetriever:
         top_k: int = 5,
         where: Optional[dict] = None,  # <-- NEW PARAM
     ) -> List[Dict[str, Any]]:
-        print(f"Retrieving documents for query: '{query}'")
-        print(f"Top k: {top_k}, where: {where}")
+        logger.debug(f"Retrieving documents for query: '{query}'")
+        logger.debug(f"Top k: {top_k}, where: {where}")
 
         # 1) Generate embedding for query
         query_embedding = self.embedding_manager.generate_embeddings([query])[0]
@@ -320,12 +323,12 @@ class RAGRetriever:
                         "rank": i + 1,
                     })
 
-                print(f"Retrieved {len(retrieved_docs)} documents")
+                logger.debug(f"Retrieved {len(retrieved_docs)} documents")
             else:
-                print("No documents found")
+                logger.debug("No documents found")
 
         except Exception as e:
-            print(f"Error during retrieval: {e}")
+            logger.error(f"Error during retrieval: {e}")
 
         # 4) Always return a list
         return retrieved_docs
@@ -344,6 +347,16 @@ llm = ChatGroq(
     model_name="llama-3.1-8b-instant",
     temperature=0.1,
     max_tokens=1024,
+)
+
+# Deliberately a different (larger) model than `llm`: using the same model to both
+# generate and grade its own answer is a biased self-evaluation and tends to
+# under-detect the generator's own mistakes.
+judge_llm = ChatGroq(
+    groq_api_key=groq_api_key,
+    model_name="llama-3.3-70b-versatile",
+    temperature=0.0,
+    max_tokens=256,
 )
 
 
@@ -450,101 +463,145 @@ Output (only the transliterated Nepali sentence):
 # 6) Where filters
 # -------------------------------------------------------------------
 
-CATEGORY_TO_SOURCES = {
-    "All (auto)": None,
-    "Pharmacy Act": ["pharmacy.pdf"],
-    "Immunization Act": ["immunization.pdf"],
-    "Constitution of Nepal": ["constitution.pdf"],
-    "Single Women Act": ["single_women.pdf"],
-    "Sports Act": ["sports.pdf"],
-}
+from arena_routing import CATEGORY_TO_SOURCES, build_where_for_category, choose_where
+from retrieval_config import RETRIEVAL_CONFIG
+from query_rewriter import rewrite_query_for_retrieval
 
 
-def build_where_for_category(category: str) -> dict | None:
-    sources = CATEGORY_TO_SOURCES.get(category)
-    if not sources:
-        return None
-    if len(sources) == 1:
-        return {"source_file": sources[0]}
-    return {"$or": [{"source_file": s} for s in sources]}
+def build_retrieval_query(query: str, llm) -> str:
+    """Produce the query actually used for retrieval.
 
-
-def choose_where(query: str, norm_query: str) -> dict | None:
+    When query rewriting is enabled we use the retrieval-optimized rewrite;
+    otherwise we fall back to the original answer-oriented expansion. Either
+    way the result is normalized to Devanagari so lexical + dense matching are
+    on the same script as the corpus.
     """
-    Decide which PDF to search based on keywords in the original and normalized query.
+    if RETRIEVAL_CONFIG.enable_query_rewriting:
+        search_query = rewrite_query_for_retrieval(query, llm)
+    else:
+        search_query = expand_query_with_llm(query, llm)
+    return normalize_to_nepali(search_query, llm)
+
+
+def retrieve_for_answer(
+    query: str,
+    retriever,
+    llm,
+    top_k: int = 6,
+    arena: str = "All (auto)",
+    rerank: Optional[bool] = None,
+):
+    """Full retrieval stage shared by rag_with_context and rag_simple.
+
+    Pipeline: build retrieval query -> route to Act -> retrieve candidates ->
+    (optional) cross-encoder rerank -> return final chunks.
+
+    When reranking is enabled we retrieve ``rerank_candidates`` (Top-20) and
+    keep ``rerank_top_k`` (Top-5) after reranking; otherwise we use the
+    original top_k behaviour. ``rerank`` overrides the config switch (used by
+    the benchmark to force a specific mode).
+
+    Returns ``(results, norm_query, where)``.
     """
-    text = (query + " " + norm_query).lower()
+    norm_query = build_retrieval_query(query, llm)
 
-    if any(word in text for word in ["pharmacy", "pharmasi", "फार्मेसी"]):
-        return {"source_file": "pharmacy.pdf"}
+    category_where = build_where_for_category(arena)
+    auto_where = choose_where(query, norm_query)
+    where = category_where if category_where is not None else auto_where
 
-    if any(word in text for word in ["immunization", "khop", "खोप", "इम्युनाइजेशन"]):
-        return {"source_file": "immunization.pdf"}
+    do_rerank = RETRIEVAL_CONFIG.enable_reranker if rerank is None else rerank
 
-    if any(word in text for word in ["constitution", "संविधान", "citizenship", "नागरिकता", "nagrita"]):
-        return {"source_file": "constitution.pdf"}
+    if do_rerank:
+        candidate_k = max(RETRIEVAL_CONFIG.rerank_candidates, top_k)
+        results = retriever.retrieve(norm_query, top_k=candidate_k, where=where)
+        if not results:
+            results = retriever.retrieve(query, top_k=candidate_k, where=where)
+        if results:
+            from reranker import get_reranker
 
-    if any(word in text for word in ["single women", "single woman", "एकल महिला", "विधवा"]):
-        return {"source_file": "single_women.pdf"}
+            results = get_reranker().rerank(
+                norm_query, results, top_k=RETRIEVAL_CONFIG.rerank_top_k
+            )
+    else:
+        effective_top_k = max(top_k, 10) if arena != "All (auto)" else top_k
+        results = retriever.retrieve(norm_query, top_k=effective_top_k, where=where)
+        if not results:
+            results = retriever.retrieve(query, top_k=effective_top_k, where=where)
 
-    if any(word in text for word in ["sports", "खेलकुद", "खेल"]):
-        return {"source_file": "sports.pdf"}
+    return results, norm_query, where
 
-    return None
+
+def format_chunk_with_citation(doc: Dict[str, Any]) -> str:
+    """Prefix a retrieved chunk with a citation tag (act name + section)
+    so the LLM can cite its source instead of inventing one."""
+    metadata = doc.get("metadata") or {}
+    act_name = metadata.get("act_name", "अज्ञात ऐन")
+    section_number = metadata.get("section_number")
+    if section_number:
+        tag = f"[स्रोत: {act_name}, धारा {section_number}]"
+    else:
+        tag = f"[स्रोत: {act_name}]"
+    return f"{tag}\n{doc['content']}"
+
+
 def rag_with_context(
     query: str,
     retriever,
     llm,
     top_k: int = 6,
     arena: str = "All (auto)",
+    rerank: Optional[bool] = None,
 ):
     """
     Same as rag_simple, but returns (final_answer, context_text)
     so we can evaluate faithfulness/correctness against the legal text.
     """
-    # Expand and normalize
-    expanded_query = expand_query_with_llm(query, llm)
-    norm_query = normalize_to_nepali(expanded_query, llm)
-
-    # Decide which PDFs to search
-    category_where = build_where_for_category(arena)
-    auto_where = choose_where(query, norm_query)
-    where = category_where if category_where is not None else auto_where
-
-    if arena != "All (auto)":
-        effective_top_k = max(top_k, 10)
-    else:
-        effective_top_k = top_k
-
-    # Retrieve
-    results = retriever.retrieve(norm_query, top_k=effective_top_k, where=where)
-    if not results:
-        results = retriever.retrieve(query, top_k=effective_top_k, where=where)
+    # Retrieval stage: rewrite query -> route -> retrieve -> optional rerank.
+    results, norm_query, where = retrieve_for_answer(
+        query, retriever, llm, top_k=top_k, arena=arena, rerank=rerank
+    )
 
     if not results:
         return "सहित सन्दर्भ (context) फेला परेन, त्यसैले म जवाफ दिन सक्दिन।", ""
 
-    # Build context
-    max_chars = 2000
+    context = build_context_from_results(results)
+    final_answer = generate_answer_from_context(query, norm_query, context, llm)
+    return final_answer, context
+
+
+def build_context_from_results(results: List[Dict[str, Any]], max_chars: int = 2000) -> str:
+    """Build the citation-tagged context string from retrieved chunks."""
     context_parts = []
     current_len = 0
     for doc in results:
-        text = doc["content"]
-        if current_len + len(text) > max_chars:
+        chunk = format_chunk_with_citation(doc)
+        if current_len + len(chunk) > max_chars:
             break
-        context_parts.append(text)
-        current_len += len(text)
-    context = "\n\n".join(context_parts)
+        context_parts.append(chunk)
+        current_len += len(chunk)
+    return "\n\n".join(context_parts)
 
-    # Same answering prompt as rag_simple
-    prompt = f"""तपाईं नेपाली कानुन बुझ्ने कानुनी सहायक हुनुहुन्छ। तल दिइएको सन्दर्भ 
-फार्मेसी, खोप, संविधान, एकल महिला, खेलकुद लगायतका नेपाली कानून तथा नीतिहरूबाट 
-लिइएको हो। सन्दर्भको मूल पाठमा टाइप/OCR सम्बन्धी त्रुटि हुन सक्छ।
+
+def generate_answer_from_context(
+    query: str, norm_query: str, context: str, llm, spellcheck: bool = True
+) -> str:
+    """Generator stage: produce the grounded Nepali answer from context.
+
+    Shared by rag_with_context and the offline benchmark so both exercise the
+    exact same answering prompt and post-processing. ``spellcheck`` can be
+    disabled (e.g. by the benchmark) to save an LLM call when the final
+    spelling pass is not needed.
+    """
+    prompt = f"""तपाईं नेपाली कानुन बुझ्ने कानुनी सहायक हुनुहुन्छ। तल दिइएको सन्दर्भ
+फार्मेसी, खोप, संविधान, एकल महिला, खेलकुद लगायतका नेपाली कानून तथा नीतिहरूबाट
+लिइएको हो। हरेक अंश माथि [स्रोत: ...] ट्यागमा ऐन र धारा नम्बर दिइएको छ।
+सन्दर्भको मूल पाठमा टाइप/OCR सम्बन्धी त्रुटि हुन सक्छ।
 
 कडा नियम:
 - सोधिएको प्रश्नको उत्तर केवल सन्दर्भमा भएको कानुनी व्यवस्थामा आधारित भएर मात्र दिनुहोस्।
 - कानुनको भाषा (धारा/उपधारा) जति सकिन्छ त्यति नजिकबाट प्रस्तुत गर्नुहोस्; यदि आवश्यक परे मात्र
   छोटो व्याख्या/स्पष्टीकरण थप्नुहोस्।
+- सान्दर्भिक भागको [स्रोत: ...] ट्याग हेरेर जवाफमा ऐन र धारा नम्बर स्पष्ट रूपमा उल्लेख गर्नुहोस्।
 - एउटै कुरा अनावश्यक रूपमा धेरैचोटि दोहोर्याउनु हुँदैन।
 - यदि सन्दर्भमा स्पष्ट जवाफ छैन भने, प्रष्ट रूपमा लेख्नुस्:
   "मलाई थाहा छैन। यो जानकारी दिइएको सन्दर्भमा छैन।"
@@ -578,9 +635,9 @@ def rag_with_context(
             dedup_lines.append(line)
     dedup_answer = "\n".join(dedup_lines)
 
-    final_answer = correct_nepali_spelling(dedup_answer, llm)
-
-    return final_answer, context
+    if spellcheck:
+        return correct_nepali_spelling(dedup_answer, llm)
+    return dedup_answer
 
 
 
@@ -595,60 +652,32 @@ def rag_simple(
     retriever,
     llm,
     top_k: int = 6,
-    arena: str = "All (auto)",  
+    arena: str = "All (auto)",
+    rerank: Optional[bool] = None,
 ) -> str:
-    
-    expanded_query = expand_query_with_llm(query, llm)
-    print("Original query:", query)
-    print("Expanded query:", expanded_query)
 
-    
-    norm_query = normalize_to_nepali(expanded_query, llm)
-    print("Normalized query:", norm_query)
-
-    
-    category_where = build_where_for_category(arena)
-
-  
-    auto_where = choose_where(query, norm_query)
-
-   
-    if category_where is not None:
-        where = category_where
-    else:
-        where = auto_where
-
-    print("Using where filter:", where)
-
-    
-    if arena != "All (auto)":
-        effective_top_k = max(top_k, 10)  # e.g., look at 10 chunks from that PDF
-    else:
-        effective_top_k = top_k
-
-   
-    results = retriever.retrieve(norm_query, top_k=effective_top_k, where=where)
-
-    # 4b) Fallback: if no results, try original query
-    if not results:
-        print("No results with normalized query, trying original query...")
-        results = retriever.retrieve(query, top_k=effective_top_k, where=where)
+    # Retrieval stage: rewrite query -> route -> retrieve -> optional rerank.
+    results, norm_query, where = retrieve_for_answer(
+        query, retriever, llm, top_k=top_k, arena=arena, rerank=rerank
+    )
+    logger.debug("Original query: %s", query)
+    logger.debug("Retrieval query: %s | where=%s", norm_query, where)
 
     if not results:
         return "सहित सन्दर्भ (context) फेला परेन, त्यसैले म जवाफ दिन सक्दिन।"
 
 
 
-    # 4) Build context (truncate if too long)
+    # 4) Build context (truncate if too long, each chunk tagged with its citation)
     max_chars = 2000  # slightly smaller to reduce repetition
     context_parts = []
     current_len = 0
     for doc in results:
-        text = doc["content"]
-        if current_len + len(text) > max_chars:
+        chunk = format_chunk_with_citation(doc)
+        if current_len + len(chunk) > max_chars:
             break
-        context_parts.append(text)
-        current_len += len(text)
+        context_parts.append(chunk)
+        current_len += len(chunk)
     context = "\n\n".join(context_parts)
 
         # 5) Prompt for answer (simpler, direct answer)
@@ -711,3 +740,13 @@ def rag_simple(
 embedding_manager = EmbeddingManager()
 vectorstore = VectorStore(reset=False)  # assume index already built
 rag_retriever = RAGRetriever(vectorstore, embedding_manager)
+
+# Lexical (BM25) index built in-sync from the same Chroma corpus, and the
+# hybrid retriever that fuses it with the dense retriever. `hybrid_retriever`
+# is drop-in compatible with `rag_retriever` (same .retrieve() signature) and
+# honors RETRIEVAL_CONFIG (falls back to dense-only when hybrid is disabled).
+from bm25_index import BM25Index
+from hybrid_retriever import HybridRetriever
+
+bm25_index = BM25Index.from_vector_store(vectorstore)
+hybrid_retriever = HybridRetriever(rag_retriever, bm25_index, config=RETRIEVAL_CONFIG)

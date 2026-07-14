@@ -1,0 +1,58 @@
+/* base.css — shared base styles for all VerdictAI pages. */
+
+/* ---- Base ---- */
+html, body { height: 100%; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* ---- Focus visibility (accessibility) ---- */
+:where(button, select, textarea, input, a, [tabindex]):focus-visible {
+  outline: 2px solid #6366f1; outline-offset: 2px; border-radius: 0.375rem;
+}
+.focus-ring:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+/* ---- Scrollbars ---- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: padding-box; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; border: 2px solid transparent; background-clip: padding-box; }
+
+/* ---- Animations ---- */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.anim-rise { animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+@keyframes dotPulse { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+.loading-dot { animation: dotPulse 1.2s infinite ease-in-out; }
+
+@keyframes shimmerMove { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.shimmer {
+  background: linear-gradient(90deg, rgba(148,163,184,0.12) 25%, rgba(148,163,184,0.28) 37%, rgba(148,163,184,0.12) 63%);
+  background-size: 200% 100%; animation: shimmerMove 1.5s infinite linear;
+}
+.dark .shimmer { background: linear-gradient(90deg, rgba(148,163,184,0.07) 25%, rgba(148,163,184,0.18) 37%, rgba(148,163,184,0.07) 63%); background-size: 200% 100%; }
+
+@keyframes blink { 50% { opacity: 0; } }
+.stream-caret { display: inline-block; width: 0.5ch; height: 1.05em; transform: translateY(0.16em); margin-left: 1px; background: currentColor; opacity: 0.65; border-radius: 1px; animation: blink 1s steps(1) infinite; }
+
+@keyframes pulseSoft { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.pulse-soft { animation: pulseSoft 1.6s ease-in-out infinite; }
+
+/* ---- Answer typography ---- */
+.answer-body p { margin: 0 0 0.72em; }
+.answer-body p:last-child { margin-bottom: 0; }
+.answer-body strong { font-weight: 700; color: #0f172a; }
+.dark .answer-body strong { color: #f1f5f9; }
+
+/* ---- Inline source chip ---- */
+.source-chip {
+  display: inline-flex; align-items: baseline; gap: 0.15rem; margin: 0 0.12rem;
+  padding: 0.02rem 0.34rem; border-radius: 0.375rem; font-size: 0.74em; font-weight: 600;
+  color: #4338ca; background: #eef2ff; white-space: nowrap;
+}
+.dark .source-chip { color: #a5b4fc; background: rgba(67, 56, 202, 0.2); }
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  .stream-caret { display: none; }
+}

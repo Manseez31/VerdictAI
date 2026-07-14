@@ -1,0 +1,47 @@
+name: ✨ Feature request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the limitation or use case you're running into.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Legal knowledge base (more Acts)
+        - Retrieval quality
+        - Case Intelligence Suite
+        - Case Simulator
+        - Translation / bilingual
+        - Frontend / UX
+        - Evaluation / benchmarks
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: This feature does not help users commit crimes, evade law enforcement, or destroy evidence, and keeps legal output grounded and cited.
+          required: true

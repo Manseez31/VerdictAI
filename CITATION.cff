@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+title: "VerdictAI: An AI Legal Reasoning Platform for Nepali Law"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: "Pradhan"
+    given-names: "Manseez B."
+  - family-names: "Basukala"
+    given-names: "Pranaya"
+  - family-names: "Phaiju"
+    given-names: "Riju"
+  - family-names: "Raut"
+    given-names: "Salon"
+repository-code: "https://github.com/Manseez31/VerdictAI"
+abstract: >-
+  VerdictAI is a retrieval-augmented legal reasoning platform for Nepali law.
+  It combines hybrid retrieval (dense embeddings + BM25 fused with Reciprocal
+  Rank Fusion) over official Nepali Acts with citation-grounded answer
+  generation, an independent LLM judge for faithfulness scoring, bilingual
+  (Nepali/English) output, and a multi-agent Legal Case Intelligence Suite that
+  produces educational case analyses.
+keywords:
+  - legal-tech
+  - retrieval-augmented-generation
+  - nepali-law
+  - multi-agent-systems
+  - large-language-models
+license: MIT
+version: 1.0.0
+date-released: "2026-07-14"

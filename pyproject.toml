@@ -1,13 +1,22 @@
 [project]
-name = "ytrag"
-version = "0.1.0"
-description = "Add your description here"
+name = "verdictai"
+version = "1.0.0"
+description = "VerdictAI — an AI legal reasoning platform for Nepali law: RAG-grounded Q&A with citations, plus a multi-agent Legal Case Intelligence Suite."
 readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [
+    { name = "Manseez B. Pradhan" },
+    { name = "Pranaya Basukala" },
+    { name = "Riju Phaiju" },
+    { name = "Salon Raut" },
+]
+keywords = ["legal-tech", "rag", "nepali-law", "multi-agent", "llm", "fastapi"]
 dependencies = [
     "chromadb>=1.3.7",
     "docling>=2.66.0",
     "faiss-cpu>=1.13.1",
+    "fastapi>=0.124.4",
     "gradio>=6.1.0",
     "ipykernel>=7.1.0",
     "joblib>=1.5.2",
@@ -15,10 +24,20 @@ dependencies = [
     "langchain-community>=0.4.1",
     "langchain-core>=1.2.0",
     "langchain-groq>=1.1.1",
+    "langchain-text-splitters>=1.0.0",
     "pandas>=2.3.3",
     "pymupdf>=1.26.7",
     "pypdf>=6.4.1",
     "python-dotenv>=1.2.1",
     "scikit-learn>=1.8.0",
     "sentence-transformers>=5.2.0",
+    "uvicorn[standard]>=0.38.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

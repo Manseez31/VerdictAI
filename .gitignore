@@ -1,11 +1,39 @@
-# Python-generated files
+# ---- Secrets (NEVER commit) ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# ---- Python ----
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
-# Virtual environments
-.venv
-.env
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+
+# ---- Local artifacts ----
+# Evaluation/benchmark output is machine-specific; regenerate with
+#   uv run python benchmark.py
+data/eval/results/
+
+# Runtime chat/eval logs
+data/rag_evaluation_log_ui.csv
+data/rag_evaluation_log.csv
+
+# ---- Editors / OS ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
